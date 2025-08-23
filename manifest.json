@@ -18,5 +18,15 @@
     "tabs",
     "downloads",
     "debugger"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "content/content.js"
+      ]
+    }
   ]
 }
