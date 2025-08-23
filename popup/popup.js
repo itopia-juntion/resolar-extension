@@ -14,6 +14,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const subjectsDropdown = document.getElementById('subjects-dropdown');
   const logoutButton = document.getElementById('logout-button');
 
+  // Helper to get data from storage
+  const getStorageData = (keys) => new Promise((resolve) => chrome.storage.local.get(keys, resolve));
+
   // Function to switch views
   const showMainApp = () => {
     loginContainer.style.display = 'none';
@@ -24,7 +27,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const showLogin = (errorMessage = null) => {
     mainAppContainer.style.display = 'none';
     loginContainer.style.display = 'block';
-    usernameInput.value = ''; // Clear fields on show
+    usernameInput.value = '';
     passwordInput.value = '';
     if (errorMessage) {
       loginError.textContent = errorMessage;
@@ -35,8 +38,8 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   // Function to populate subjects dropdown
-  const populateSubjects = (subjects) => {
-    subjectsDropdown.innerHTML = ''; // Clear existing options
+  const populateSubjects = (subjects, selectedId = null) => {
+    subjectsDropdown.innerHTML = '';
     if (subjects && subjects.length > 0) {
       subjects.forEach(subject => {
         const option = document.createElement('option');
@@ -44,7 +47,10 @@ document.addEventListener('DOMContentLoaded', () => {
         option.textContent = subject.name;
         subjectsDropdown.appendChild(option);
       });
-       subjectsDropdown.disabled = false;
+      subjectsDropdown.disabled = false;
+      if (selectedId) {
+        subjectsDropdown.value = selectedId;
+      }
     } else {
       const option = document.createElement('option');
       option.textContent = '사용 가능한 주제 없음';
@@ -60,16 +66,34 @@ document.addEventListener('DOMContentLoaded', () => {
       urlSpan.textContent = tab.url || '(알 수 없음)';
     }
 
-    // Fetch and populate subjects
+    // 1. Load cached subjects and selection instantly
+    const { cachedSubjects, lastSelectedSubjectId } = await getStorageData(['cachedSubjects', 'lastSelectedSubjectId']);
+    if (cachedSubjects) {
+      populateSubjects(cachedSubjects, lastSelectedSubjectId);
+    }
+
+    // 2. Fetch fresh subjects in the background
     chrome.runtime.sendMessage({ action: 'getSubjects' }, (response) => {
       if (response && response.success) {
-        populateSubjects(response.data);
-      } else {
-        statusDiv.textContent = `주제 로딩 실패: ${response.error || '알 수 없는 오류'}`;
+        const freshSubjects = response.data;
+        const previouslySelectedId = subjectsDropdown.value;
+
+        // 3. Update storage with fresh data
+        chrome.storage.local.set({ cachedSubjects: freshSubjects });
+
+        // 4. Re-populate dropdown and try to preserve selection
+        const selectionStillExists = freshSubjects.some(s => s.id == previouslySelectedId);
+        const newSelectedId = selectionStillExists ? previouslySelectedId : (freshSubjects[0]?.id || null);
+        
+        populateSubjects(freshSubjects, newSelectedId);
+
+      } else if (response) {
+        // Don't overwrite status if it's not a critical error
+        console.warn(`주제 로딩 실패: ${response.error || '알 수 없는 오류'}`);
         if (response.shouldRelogin) {
-            chrome.storage.local.remove(['accessToken', 'username', 'password'], () => {
-                showLogin('세션이 만료되었습니다. 다시 로그인해주세요.');
-            });
+          chrome.storage.local.remove(['accessToken', 'username', 'password', 'cachedSubjects', 'lastSelectedSubjectId'], () => {
+            showLogin('세션이 만료되었습니다. 다시 로그인해주세요.');
+          });
         }
       }
     });
@@ -88,6 +112,9 @@ document.addEventListener('DOMContentLoaded', () => {
         statusDiv.textContent = '저장할 주제를 선택해주세요.';
         return;
       }
+
+      // Persist the last selected subject ID
+      chrome.storage.local.set({ lastSelectedSubjectId: selectedSubjectId });
 
       statusDiv.textContent = '콘텐츠를 추출하는 중...';
       let contentResponse;
@@ -119,7 +146,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
           statusDiv.textContent = `오류: ${serverResponse.error || '알 수 없는 오류'}`;
           if (serverResponse.shouldRelogin) {
-            chrome.storage.local.remove(['accessToken', 'username', 'password'], () => {
+            chrome.storage.local.remove(['accessToken', 'username', 'password', 'cachedSubjects', 'lastSelectedSubjectId'], () => {
                 showLogin('세션이 만료되었습니다. 다시 로그인해주세요.');
             });
           }
@@ -173,8 +200,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Handle Logout Button Click
   logoutButton.addEventListener('click', () => {
-    chrome.storage.local.remove(['accessToken', 'username', 'password'], () => {
-      console.log('Logged out and token removed.');
+    // Clear all relevant storage on logout
+    chrome.storage.local.remove(['accessToken', 'username', 'password', 'cachedSubjects', 'lastSelectedSubjectId'], () => {
+      console.log('Logged out and all user data cleared.');
       showLogin();
     });
   });
