@@ -154,6 +154,28 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         console.error("Error fetching subjects:", error);
         sendResponse({ success: false, error: error.message });
     });
+  } else if (request.action === 'addSubject') {
+    const endpoint = `${API_BASE_URL}/subjects`;
+    fetchWithAuth(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: request.name })
+    })
+    .then(async response => {
+        if (response.status === 200) { // Created
+            return { success: true, data: null };
+        }
+        if (response.shouldRelogin) {
+            return { success: false, error: response.error, shouldRelogin: true };
+        }
+        const errorData = await response.json().catch(() => ({ message: '주제를 추가할 수 없습니다.' }));
+        return { success: false, error: errorData.message || `HTTP ${response.status}` };
+    })
+    .then(sendResponse)
+    .catch(error => {
+        console.error("Error adding subject:", error);
+        sendResponse({ success: false, error: error.message });
+    });
   } else {
       keepChannelOpen = false;
   }

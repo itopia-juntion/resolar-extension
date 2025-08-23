@@ -15,12 +15,12 @@
     </header>
     <section class="info">
       <div id="login-error" class="status" style="display: none; color: red;"></div>
-      <input type="text" id="username" placeholder="아이디 (3~20자)" minlength="3" maxlength="20" required style="margin-bottom: 8px; width: 90%;">
-      <input type="password" id="password" placeholder="비밀번호 (8자 이상)" minlength="8" required style="margin-bottom: 8px; width: 90%;">
+      <input type="text" id="username" placeholder="아이디 (3~20자)" minlength="3" maxlength="20" required>
+      <input type="password" id="password" placeholder="비밀번호 (8자 이상)" minlength="8" required>
       <button id="login-button">로그인</button>
     </section>
     <footer>
-      <a href="https://junction2025-resolar.web.app/#/login" target="_blank">회원가입</a>
+      <a href="https://aap.app/login" target="_blank">회원가입</a>
     </footer>
   </div>
 
@@ -32,16 +32,29 @@
     <section class="info">
       <div><strong>탭 URL:</strong> <span id="url">불러오는 중…</span></div>
       
-      <div style="margin-top: 8px; margin-bottom: 8px;">
-        <label for="subjects-dropdown" style="margin-right: 8px;"><strong>주제:</strong></label>
-        <select id="subjects-dropdown" style="width: 70%;"></select>
+      <!-- 주제 선택 섹션 -->
+      <div id="subject-selection-container" class="subject-container">
+        <div class="subject-header">
+          <label for="subjects-dropdown"><strong>주제:</strong></label>
+          <button id="add-subject-button" class="text-button">추가</button>
+        </div>
+        <select id="subjects-dropdown"></select>
+      </div>
+
+      <!-- 주제 추가 섹션 (숨김) -->
+      <div id="add-subject-container" class="subject-container" style="display: none;">
+        <input type="text" id="new-subject-name" placeholder="새 주제 이름">
+        <div class="button-group">
+          <button id="cancel-add-subject-button">취소</button>
+          <button id="save-subject-button">저장</button>
+        </div>
       </div>
 
       <div id="status" class="status"></div>
       <button id="save-page-button">이 페이지 저장</button>
     </section>
     <footer>
-      <a href="https://junction2025-resolar.web.app/" target="_blank" id="dashboard-link">대시보드 바로 가기</a>
+      <a href="https://aa.aa" target="_blank" id="dashboard-link">대시보드 바로 가기</a>
       <button id="logout-button">로그아웃</button>
     </footer>
   </div>

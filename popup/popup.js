@@ -14,6 +14,14 @@ document.addEventListener('DOMContentLoaded', () => {
   const subjectsDropdown = document.getElementById('subjects-dropdown');
   const logoutButton = document.getElementById('logout-button');
 
+  // Subject UI Elements
+  const subjectSelectionContainer = document.getElementById('subject-selection-container');
+  const addSubjectContainer = document.getElementById('add-subject-container');
+  const addSubjectButton = document.getElementById('add-subject-button');
+  const newSubjectNameInput = document.getElementById('new-subject-name');
+  const cancelAddSubjectButton = document.getElementById('cancel-add-subject-button');
+  const saveSubjectButton = document.getElementById('save-subject-button');
+
   // Helper to get data from storage
   const getStorageData = (keys) => new Promise((resolve) => chrome.storage.local.get(keys, resolve));
 
@@ -59,6 +67,30 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 
+  // Function to fetch and update subjects list
+  const fetchAndUpdateSubjects = async (selectIdAfterFetch = null) => {
+    const { lastSelectedSubjectId } = await getStorageData(['lastSelectedSubjectId']);
+    
+    chrome.runtime.sendMessage({ action: 'getSubjects' }, (response) => {
+      if (response && response.success) {
+        const freshSubjects = response.data;
+        chrome.storage.local.set({ cachedSubjects: freshSubjects });
+
+        const idToSelect = selectIdAfterFetch 
+            || (freshSubjects.some(s => s.id == lastSelectedSubjectId) ? lastSelectedSubjectId : (freshSubjects[0]?.id || null));
+
+        populateSubjects(freshSubjects, idToSelect);
+      } else if (response) {
+        statusDiv.textContent = `주제 로딩 실패: ${response.error || '알 수 없는 오류'}`;
+        if (response.shouldRelogin) {
+          chrome.storage.local.remove(['accessToken', 'username', 'password', 'cachedSubjects', 'lastSelectedSubjectId'], () => {
+            showLogin('세션이 만료되었습니다. 다시 로그인해주세요.');
+          });
+        }
+      }
+    });
+  };
+
   // Function to initialize the main app logic
   const initializeMainApp = async () => {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -71,26 +103,7 @@ document.addEventListener('DOMContentLoaded', () => {
       populateSubjects(cachedSubjects, lastSelectedSubjectId);
     }
 
-    chrome.runtime.sendMessage({ action: 'getSubjects' }, (response) => {
-      if (response && response.success) {
-        const freshSubjects = response.data;
-        const previouslySelectedId = subjectsDropdown.value;
-        chrome.storage.local.set({ cachedSubjects: freshSubjects });
-
-        const selectionStillExists = freshSubjects.some(s => s.id == previouslySelectedId);
-        const newSelectedId = selectionStillExists ? previouslySelectedId : (freshSubjects[0]?.id || null);
-        
-        populateSubjects(freshSubjects, newSelectedId);
-
-      } else if (response) {
-        console.warn(`주제 로딩 실패: ${response.error || '알 수 없는 오류'}`);
-        if (response.shouldRelogin) {
-          chrome.storage.local.remove(['accessToken', 'username', 'password', 'cachedSubjects', 'lastSelectedSubjectId'], () => {
-            showLogin('세션이 만료되었습니다. 다시 로그인해주세요.');
-          });
-        }
-      }
-    });
+    fetchAndUpdateSubjects();
 
     const newSaveButton = saveButton.cloneNode(true);
     saveButton.parentNode.replaceChild(newSaveButton, saveButton);
@@ -148,6 +161,8 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   };
 
+  // --- Event Listeners ---
+
   // Check login status on popup open
   chrome.storage.local.get(['accessToken'], (result) => {
     if (result.accessToken) {
@@ -174,12 +189,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     loginError.style.display = 'none';
 
-    // Disable button to prevent multiple clicks
     loginButton.disabled = true;
     loginButton.textContent = '로그인 중...';
 
     chrome.runtime.sendMessage({ action: 'login', data: { username, password } }, (response) => {
-      // Re-enable button regardless of the outcome
       loginButton.disabled = false;
       loginButton.textContent = '로그인';
 
@@ -204,6 +217,47 @@ document.addEventListener('DOMContentLoaded', () => {
     chrome.storage.local.remove(['accessToken', 'username', 'password', 'cachedSubjects', 'lastSelectedSubjectId'], () => {
       console.log('Logged out and all user data cleared.');
       showLogin();
+    });
+  });
+
+  // Handle Subject UI switching
+  addSubjectButton.addEventListener('click', () => {
+    subjectSelectionContainer.style.display = 'none';
+    addSubjectContainer.style.display = 'block';
+    newSubjectNameInput.focus();
+  });
+
+  cancelAddSubjectButton.addEventListener('click', () => {
+    addSubjectContainer.style.display = 'none';
+    subjectSelectionContainer.style.display = 'block';
+    newSubjectNameInput.value = '';
+  });
+
+  // Handle Save New Subject
+  saveSubjectButton.addEventListener('click', () => {
+    const newName = newSubjectNameInput.value.trim();
+    if (!newName) {
+      statusDiv.textContent = '주제 이름은 비워둘 수 없습니다.';
+      return;
+    }
+
+    saveSubjectButton.disabled = true;
+    saveSubjectButton.textContent = '저장 중...';
+
+    chrome.runtime.sendMessage({ action: 'addSubject', name: newName }, (response) => {
+      saveSubjectButton.disabled = false;
+      saveSubjectButton.textContent = '저장';
+
+      if (response && response.success) {
+        statusDiv.textContent = `'${newName}' 주제가 추가되었습니다.`;
+        newSubjectNameInput.value = '';
+        addSubjectContainer.style.display = 'none';
+        subjectSelectionContainer.style.display = 'block';
+        // Fetch subjects again and select the new one
+        fetchAndUpdateSubjects(response.data.id);
+      } else {
+        statusDiv.textContent = `오류: ${response.error || '주제 추가 실패'}`;
+      }
     });
   });
 });

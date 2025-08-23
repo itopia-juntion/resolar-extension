@@ -75,6 +75,16 @@ button {
     background-color: var(--secondary-button-hover-bg);
 }
 
+.text-button {
+    background: none;
+    border: none;
+    color: var(--link-color);
+    padding: 0;
+    font-size: 13px;
+}
+.text-button:hover {
+    text-decoration: underline;
+}
 
 /* Inputs and Selects */
 input[type="text"], input[type="password"], select {
@@ -83,12 +93,17 @@ input[type="text"], input[type="password"], select {
   border: 1px solid var(--border-color);
   border-radius: 6px;
   padding: 8px;
-  width: 100%; /* Make them full width */
-  box-sizing: border-box; /* Include padding and border in the element's total width and height */
+  width: 100%;
+  box-sizing: border-box;
+  margin-bottom: 8px;
 }
 
 input::placeholder {
   color: var(--text-color-dim);
+}
+
+select {
+    margin-bottom: 0;
 }
 
 select:disabled {
@@ -117,4 +132,35 @@ footer {
     display: flex;
     justify-content: space-between;
     align-items: center;
+}
+
+/* Subject Section */
+.subject-container {
+    margin-top: 8px;
+    margin-bottom: 8px;
+}
+.subject-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+.subject-header label {
+    font-weight: 600;
+}
+
+.button-group {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    margin-top: 4px;
+}
+
+.button-group button {
+    background-color: var(--secondary-button-bg);
+    padding: 6px 10px;
+}
+
+.button-group button#save-subject-button {
+    background-color: var(--primary-button-bg);
 }
