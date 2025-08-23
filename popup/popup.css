@@ -1,36 +1,120 @@
 /* popup/popup.css */
+:root {
+  --bg-color: #111827;
+  --text-color: #E5E7EB;
+  --text-color-dim: #9CA3AF;
+  --header-color: #FFFFFF;
+  --primary-button-bg: #3B82F6;
+  --primary-button-text: #FFFFFF;
+  --secondary-button-bg: #374151;
+  --secondary-button-hover-bg: #4B5563;
+  --border-color: #374151;
+  --input-bg: #1F2937;
+  --link-color: #60A5FA;
+  --success-color: #34D399;
+  --error-color: #F87171;
+}
+
 html, body {
   margin: 0;
   padding: 12px;
-  min-width: 280px;
+  min-width: 300px;
   font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, Apple Color Emoji, Segoe UI Emoji;
   font-size: 14px;
   line-height: 1.45;
+  background-color: var(--bg-color);
+  color: var(--text-color);
 }
+
 header h1 {
   font-size: 16px;
   margin: 0 0 8px;
+  color: var(--header-color);
+  font-weight: 600;
 }
-.row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 8px 0;
+
+a {
+  color: var(--link-color);
+  text-decoration: none;
 }
-button {
-  cursor: pointer;
-  border: 1px solid #ddd;
-  padding: 8px 10px;
-  border-radius: 6px;
-  background: #fff;
+a:hover {
+  text-decoration: underline;
 }
-button:hover { background: #f6f6f6; }
+
 .info {
   margin-top: 8px;
   padding-top: 8px;
-  border-top: 1px solid #eee;
+  border-top: 1px solid var(--border-color);
 }
+
+/* Buttons */
+button {
+  cursor: pointer;
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  font-weight: 500;
+}
+
+#save-page-button, #login-button {
+  background-color: var(--primary-button-bg);
+  color: var(--primary-button-text);
+  width: 100%;
+  margin-top: 8px;
+}
+#save-page-button:hover, #login-button:hover {
+  background-color: #2563EB;
+}
+
+#logout-button {
+    background-color: var(--secondary-button-bg);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+}
+#logout-button:hover {
+    background-color: var(--secondary-button-hover-bg);
+}
+
+
+/* Inputs and Selects */
+input[type="text"], input[type="password"], select {
+  background-color: var(--input-bg);
+  color: var(--text-color);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 8px;
+  width: 100%; /* Make them full width */
+  box-sizing: border-box; /* Include padding and border in the element's total width and height */
+}
+
+input::placeholder {
+  color: var(--text-color-dim);
+}
+
+select:disabled {
+    opacity: 0.5;
+}
+
+/* Status Messages */
 .status {
-  margin-top: 6px;
-  color: #0a0;
+  margin-top: 8px;
+  margin-bottom: 4px;
+  font-weight: 500;
+  min-height: 1.2em;
+}
+#status {
+  color: var(--success-color);
+}
+#login-error {
+    color: var(--error-color);
+}
+
+/* Footer */
+footer {
+    margin-top: 12px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 }
