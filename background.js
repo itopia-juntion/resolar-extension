@@ -99,14 +99,12 @@ async function fetchWithAuth(url, options = {}, isRetry = false) {
 
 // Listen for messages from popup or content scripts
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  let keepChannelOpen = false;
+  let keepChannelOpen = true; // Keep message channel open for async response
 
   if (request.action === 'login') {
-    keepChannelOpen = true; 
     const { username, password } = request.data;
     login(username, password).then(sendResponse);
   } else if (request.action === 'submitData') {
-    keepChannelOpen = true; 
     const endpoint = `${API_BASE_URL}/pages`;
     
     fetchWithAuth(endpoint, {
@@ -116,20 +114,42 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       },
       body: JSON.stringify(request.data),
     })
-    .then(response => {
+    .then(async response => {
         if (response.ok) {
-            return response.json().then(data => ({success: true, data}));
+            return { success: true, data: await response.json() };
         }
         if (response.shouldRelogin) {
-            return { success: false, error: response.error };
+            return { success: false, error: response.error, shouldRelogin: true };
         }
-        return response.json().then(errorData => ({ success: false, error: errorData.message || '알 수 없는 서버 오류' }));
+        const errorData = await response.json().catch(() => ({ message: '알 수 없는 서버 오류' }));
+        return { success: false, error: errorData.message || `HTTP ${response.status}` };
     })
     .then(sendResponse)
     .catch(error => {
         console.error("Error submitting data:", error);
         sendResponse({ success: false, error: error.message });
     });
+  } else if (request.action === 'getSubjects') {
+    const endpoint = `${API_BASE_URL}/subjects`;
+    fetchWithAuth(endpoint, { method: 'GET' })
+    .then(async response => {
+        if (response.ok) {
+            return { success: true, data: await response.json() };
+        }
+        if (response.shouldRelogin) {
+            return { success: false, error: response.error, shouldRelogin: true };
+        }
+        const errorData = await response.json().catch(() => ({ message: '주제 목록을 불러올 수 없습니다.' }));
+        return { success: false, error: errorData.message || `HTTP ${response.status}` };
+    })
+    .then(sendResponse)
+    .catch(error => {
+        console.error("Error fetching subjects:", error);
+        sendResponse({ success: false, error: error.message });
+    });
+  }
+  else {
+      keepChannelOpen = false; // No async action, close channel
   }
 
   return keepChannelOpen;

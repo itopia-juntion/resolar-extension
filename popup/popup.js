@@ -11,6 +11,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const urlSpan = document.getElementById('url');
   const statusDiv = document.getElementById('status');
   const saveButton = document.getElementById('save-page-button');
+  const subjectsDropdown = document.getElementById('subjects-dropdown');
 
   // Function to switch views
   const showMainApp = () => {
@@ -28,12 +29,44 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 
+  // Function to populate subjects dropdown
+  const populateSubjects = (subjects) => {
+    subjectsDropdown.innerHTML = ''; // Clear existing options
+    if (subjects && subjects.length > 0) {
+      subjects.forEach(subject => {
+        const option = document.createElement('option');
+        option.value = subject.id;
+        option.textContent = subject.name;
+        subjectsDropdown.appendChild(option);
+      });
+    } else {
+      const option = document.createElement('option');
+      option.textContent = '사용 가능한 주제 없음';
+      option.disabled = true;
+      subjectsDropdown.appendChild(option);
+    }
+  };
+
   // Function to initialize the main app logic
   const initializeMainApp = async () => {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     if (tab) {
       urlSpan.textContent = tab.url || '(알 수 없음)';
     }
+
+    // Fetch and populate subjects
+    chrome.runtime.sendMessage({ action: 'getSubjects' }, (response) => {
+      if (response && response.success) {
+        populateSubjects(response.data);
+      } else {
+        statusDiv.textContent = `주제 로딩 실패: ${response.error}`;
+        if (response.shouldRelogin) {
+            chrome.storage.local.remove(['accessToken', 'username', 'password'], () => {
+                showLogin('세션이 만료되었습니다. 다시 로그인해주세요.');
+            });
+        }
+      }
+    });
 
     const newSaveButton = saveButton.cloneNode(true);
     saveButton.parentNode.replaceChild(newSaveButton, saveButton);
@@ -44,12 +77,16 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
 
+      const selectedSubjectId = subjectsDropdown.value;
+      if (!selectedSubjectId || subjectsDropdown.disabled) {
+        statusDiv.textContent = '저장할 주제를 선택해주세요.';
+        return;
+      }
+
       statusDiv.textContent = '콘텐츠를 추출하는 중...';
       let contentResponse;
       try {
-        contentResponse = await chrome.tabs.sendMessage(tab.id, {
-          action: 'getContent',
-        });
+        contentResponse = await chrome.tabs.sendMessage(tab.id, { action: 'getContent' });
       } catch (e) {
         console.error('콘텐츠 스크립트 통신 오류:', e);
         statusDiv.textContent = '현재 페이지의 콘텐츠를 가져올 수 없습니다.';
@@ -65,32 +102,23 @@ document.addEventListener('DOMContentLoaded', () => {
         title: tab.title,
         url: tab.url,
         content: contentResponse.content,
-        timestamp: new Date().toISOString(),
+        subjectId: parseInt(selectedSubjectId, 10),
       };
 
       statusDiv.textContent = '서버로 전송하는 중...';
       
-      try {
-        const serverResponse = await chrome.runtime.sendMessage({
-          action: 'submitData',
-          data: data
-        });
-
-        if (serverResponse.success) {
+      chrome.runtime.sendMessage({ action: 'submitData', data: data }, (serverResponse) => {
+        if (serverResponse && serverResponse.success) {
           statusDiv.textContent = '페이지가 성공적으로 저장되었습니다!';
         } else {
           statusDiv.textContent = `오류: ${serverResponse.error || '알 수 없는 오류'}`;
-          // If the error indicates a need to re-login, show the login page.
-          if (serverResponse.error.includes('로그인')) {
-             chrome.storage.local.remove(['accessToken', 'username', 'password'], () => {
+          if (serverResponse.shouldRelogin) {
+            chrome.storage.local.remove(['accessToken', 'username', 'password'], () => {
                 showLogin('세션이 만료되었습니다. 다시 로그인해주세요.');
-             });
+            });
           }
         }
-      } catch (error) {
-        console.error('백그라운드 통신 오류:', error);
-        statusDiv.textContent = `전송 중 오류가 발생했습니다: ${error.message}`;
-      }
+      });
     });
   };
 
