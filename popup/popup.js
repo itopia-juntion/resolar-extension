@@ -12,6 +12,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const statusDiv = document.getElementById('status');
   const saveButton = document.getElementById('save-page-button');
   const subjectsDropdown = document.getElementById('subjects-dropdown');
+  const logoutButton = document.getElementById('logout-button');
 
   // Function to switch views
   const showMainApp = () => {
@@ -23,9 +24,13 @@ document.addEventListener('DOMContentLoaded', () => {
   const showLogin = (errorMessage = null) => {
     mainAppContainer.style.display = 'none';
     loginContainer.style.display = 'block';
+    usernameInput.value = ''; // Clear fields on show
+    passwordInput.value = '';
     if (errorMessage) {
       loginError.textContent = errorMessage;
       loginError.style.display = 'block';
+    } else {
+      loginError.style.display = 'none';
     }
   };
 
@@ -39,11 +44,12 @@ document.addEventListener('DOMContentLoaded', () => {
         option.textContent = subject.name;
         subjectsDropdown.appendChild(option);
       });
+       subjectsDropdown.disabled = false;
     } else {
       const option = document.createElement('option');
       option.textContent = '사용 가능한 주제 없음';
-      option.disabled = true;
       subjectsDropdown.appendChild(option);
+      subjectsDropdown.disabled = true;
     }
   };
 
@@ -59,7 +65,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (response && response.success) {
         populateSubjects(response.data);
       } else {
-        statusDiv.textContent = `주제 로딩 실패: ${response.error}`;
+        statusDiv.textContent = `주제 로딩 실패: ${response.error || '알 수 없는 오류'}`;
         if (response.shouldRelogin) {
             chrome.storage.local.remove(['accessToken', 'username', 'password'], () => {
                 showLogin('세션이 만료되었습니다. 다시 로그인해주세요.');
@@ -162,6 +168,14 @@ document.addEventListener('DOMContentLoaded', () => {
         loginError.textContent = (response && response.error) || '로그인 실패. 아이디/비밀번호를 확인하세요.';
         loginError.style.display = 'block';
       }
+    });
+  });
+
+  // Handle Logout Button Click
+  logoutButton.addEventListener('click', () => {
+    chrome.storage.local.remove(['accessToken', 'username', 'password'], () => {
+      console.log('Logged out and token removed.');
+      showLogin();
     });
   });
 });
