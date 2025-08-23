@@ -1,55 +1,139 @@
-// popup/popup.js
-document.addEventListener("DOMContentLoaded", async () => {
-  const status = document.getElementById("status");
-  const urlSpan = document.getElementById("url");
-  const saveButton = document.getElementById("save-page-button");
+document.addEventListener('DOMContentLoaded', () => {
+  // DOM Elements
+  const loginContainer = document.getElementById('login-container');
+  const mainAppContainer = document.getElementById('main-app');
+  const loginButton = document.getElementById('login-button');
+  const usernameInput = document.getElementById('username');
+  const passwordInput = document.getElementById('password');
+  const loginError = document.getElementById('login-error');
 
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (tab) {
-    urlSpan.textContent = tab.url || "(알 수 없음)";
-  }
+  // Main App UI Elements
+  const urlSpan = document.getElementById('url');
+  const statusDiv = document.getElementById('status');
+  const saveButton = document.getElementById('save-page-button');
 
-  saveButton.addEventListener("click", async () => {
-    if (!tab) {
-      status.textContent = "탭 정보를 가져올 수 없습니다.";
-      return;
+  // Function to switch views
+  const showMainApp = () => {
+    loginContainer.style.display = 'none';
+    mainAppContainer.style.display = 'block';
+    initializeMainApp();
+  };
+
+  const showLogin = (errorMessage = null) => {
+    mainAppContainer.style.display = 'none';
+    loginContainer.style.display = 'block';
+    if (errorMessage) {
+      loginError.textContent = errorMessage;
+      loginError.style.display = 'block';
+    }
+  };
+
+  // Function to initialize the main app logic
+  const initializeMainApp = async () => {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (tab) {
+      urlSpan.textContent = tab.url || '(알 수 없음)';
     }
 
-    status.textContent = "콘텐츠를 추출하는 중...";
-    let response;
-    try {
-      response = await chrome.tabs.sendMessage(tab.id, {
-        action: "getContent",
-      });
-    } catch (e) {
-      status.textContent = "콘텐츠를 가져올 수 없습니다!";
-      return;
-    }
+    const newSaveButton = saveButton.cloneNode(true);
+    saveButton.parentNode.replaceChild(newSaveButton, saveButton);
 
-    const data = {
-      title: tab.title,
-      url: tab.url,
-      content: response.content,
-      timestamp: new Date().toISOString(),
-    };
-
-    status.textContent = "서버로 전송하는 중...";
-    try {
-      const res = await fetch("https://example.com/api/submit", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(data),
-      });
-
-      if (res.ok) {
-        status.textContent = "페이지가 성공적으로 저장되었습니다!";
-      } else {
-        status.textContent = `오류: ${res.status} ${res.statusText}`;
+    newSaveButton.addEventListener('click', async () => {
+      if (!tab) {
+        statusDiv.textContent = '탭 정보를 가져올 수 없습니다.';
+        return;
       }
-    } catch (error) {
-      status.textContent = `전송 중 오류가 발생했습니다: ${error.message}`;
+
+      statusDiv.textContent = '콘텐츠를 추출하는 중...';
+      let contentResponse;
+      try {
+        contentResponse = await chrome.tabs.sendMessage(tab.id, {
+          action: 'getContent',
+        });
+      } catch (e) {
+        console.error('콘텐츠 스크립트 통신 오류:', e);
+        statusDiv.textContent = '현재 페이지의 콘텐츠를 가져올 수 없습니다.';
+        return;
+      }
+
+      if (!contentResponse || !contentResponse.content) {
+        statusDiv.textContent = '추출된 콘텐츠가 없습니다.';
+        return;
+      }
+
+      const data = {
+        title: tab.title,
+        url: tab.url,
+        content: contentResponse.content,
+        timestamp: new Date().toISOString(),
+      };
+
+      statusDiv.textContent = '서버로 전송하는 중...';
+      
+      try {
+        const serverResponse = await chrome.runtime.sendMessage({
+          action: 'submitData',
+          data: data
+        });
+
+        if (serverResponse.success) {
+          statusDiv.textContent = '페이지가 성공적으로 저장되었습니다!';
+        } else {
+          statusDiv.textContent = `오류: ${serverResponse.error || '알 수 없는 오류'}`;
+          // If the error indicates a need to re-login, show the login page.
+          if (serverResponse.error.includes('로그인')) {
+             chrome.storage.local.remove(['accessToken', 'username', 'password'], () => {
+                showLogin('세션이 만료되었습니다. 다시 로그인해주세요.');
+             });
+          }
+        }
+      } catch (error) {
+        console.error('백그라운드 통신 오류:', error);
+        statusDiv.textContent = `전송 중 오류가 발생했습니다: ${error.message}`;
+      }
+    });
+  };
+
+  // Check login status on popup open
+  chrome.storage.local.get(['accessToken'], (result) => {
+    if (result.accessToken) {
+      showMainApp();
+    } else {
+      showLogin();
     }
+  });
+
+  // Handle Login Button Click
+  loginButton.addEventListener('click', () => {
+    const username = usernameInput.value;
+    const password = passwordInput.value;
+
+    if (username.length < 3 || username.length > 20) {
+      loginError.textContent = '아이디는 3~20자여야 합니다.';
+      loginError.style.display = 'block';
+      return;
+    }
+    if (password.length < 8) {
+      loginError.textContent = '비밀번호는 8자 이상이어야 합니다.';
+      loginError.style.display = 'block';
+      return;
+    }
+    loginError.style.display = 'none';
+
+    chrome.runtime.sendMessage({ action: 'login', data: { username, password } }, (response) => {
+      if (chrome.runtime.lastError) {
+        console.error(chrome.runtime.lastError.message);
+        loginError.textContent = '알 수 없는 오류가 발생했습니다.';
+        loginError.style.display = 'block';
+        return;
+      }
+
+      if (response && response.success) {
+        showMainApp();
+      } else {
+        loginError.textContent = (response && response.error) || '로그인 실패. 아이디/비밀번호를 확인하세요.';
+        loginError.style.display = 'block';
+      }
+    });
   });
 });

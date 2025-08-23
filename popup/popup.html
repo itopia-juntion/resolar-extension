@@ -7,19 +7,37 @@
   <link rel="stylesheet" href="popup.css" />
 </head>
 <body>
-  <header>
-    <h1>Resolar</h1>
-  </header>
 
-  <section class="info">
-    <div><strong>탭 URL:</strong> <span id="url">불러오는 중…</span></div>
-    <div id="status" class="status"></div>
-    <button id="save-page-button">이 페이지 저장</button>
-  </section>
+  <!-- 로그인 컨테이너 -->
+  <div id="login-container" style="display: none;">
+    <header>
+      <h1>Resolar 로그인</h1>
+    </header>
+    <section class="info">
+      <div id="login-error" class="status" style="display: none; color: red;"></div>
+      <input type="text" id="username" placeholder="아이디 (3~20자)" minlength="3" maxlength="20" required style="margin-bottom: 8px; width: 90%;">
+      <input type="password" id="password" placeholder="비밀번호 (8자 이상)" minlength="8" required style="margin-bottom: 8px; width: 90%;">
+      <button id="login-button">로그인</button>
+    </section>
+    <footer>
+      <a href="https://aap.app/login" target="_blank">회원가입</a>
+    </footer>
+  </div>
 
-  <footer>
-    <a href="../options/options.html" target="_blank">옵션 페이지 열기</a>
-  </footer>
+  <!-- 메인 앱 컨테이너 -->
+  <div id="main-app" style="display: none;">
+    <header>
+      <h1>Resolar</h1>
+    </header>
+    <section class="info">
+      <div><strong>탭 URL:</strong> <span id="url">불러오는 중…</span></div>
+      <div id="status" class="status"></div>
+      <button id="save-page-button">이 페이지 저장</button>
+    </section>
+    <footer>
+      <a href="../options/options.html" target="_blank">옵션 페이지 열기</a>
+    </footer>
+  </div>
 
   <script src="popup.js"></script>
 </body>
