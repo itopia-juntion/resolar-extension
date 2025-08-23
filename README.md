@@ -1,6 +1,6 @@
-# Chrome Extension MV3 Starter (KR)
+# Resolar
 
-기본 MV3 템플릿입니다. 팝업/옵션/콘텐츠 스크립트/백그라운드(Service Worker) 구조를 포함합니다.
+Resolar 프로젝트 README입니다.
 
 ## 설치 (Load unpacked)
 1. 크롬 주소창에 `chrome://extensions` 입력 후 엔터

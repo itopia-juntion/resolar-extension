@@ -1,7 +1,7 @@
 // background.js (service worker, MV3)
 // 설치 시 기본값 저장
 chrome.runtime.onInstalled.addListener(async () => {
-  console.log("MV3 Starter installed.");
+  console.log("Resolar installed.");
 });
 
 // 전체 페이지 캡처 유틸

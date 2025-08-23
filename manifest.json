@@ -1,10 +1,10 @@
 {
   "manifest_version": 3,
-  "name": "MV3 Starter (KR)",
-  "description": "기본 MV3 크롬 확장 예제: 팝업, 옵션, 콘텐츠 스크립트, 백그라운드.",
+  "name": "Resolar",
+  "description": "Resolar 확장 프로그램입니다.",
   "version": "1.0.0",
   "action": {
-    "default_title": "MV3 Starter",
+    "default_title": "Resolar",
     "default_popup": "popup/popup.html"
   },
   "options_page": "options/options.html",
