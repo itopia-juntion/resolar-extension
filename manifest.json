@@ -7,7 +7,6 @@
     "default_title": "Resolar",
     "default_popup": "popup/popup.html"
   },
-  "options_page": "options/options.html",
   "background": {
     "service_worker": "background.js",
     "type": "module"
@@ -16,8 +15,7 @@
     "storage",
     "activeTab",
     "tabs",
-    "downloads",
-    "debugger"
+    "notifications"
   ],
   "content_scripts": [
     {
@@ -28,5 +26,14 @@
         "content/content.js"
       ]
     }
-  ]
+  ],
+  "commands": {
+    "save-page": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+S",
+        "mac": "Command+Shift+S"
+      },
+      "description": "현재 페이지를 저장합니다."
+    }
+  }
 }

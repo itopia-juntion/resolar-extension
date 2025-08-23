@@ -48,7 +48,7 @@ document.addEventListener('DOMContentLoaded', () => {
         subjectsDropdown.appendChild(option);
       });
       subjectsDropdown.disabled = false;
-      if (selectedId) {
+      if (selectedId && subjects.some(s => s.id == selectedId)) {
         subjectsDropdown.value = selectedId;
       }
     } else {
@@ -66,29 +66,23 @@ document.addEventListener('DOMContentLoaded', () => {
       urlSpan.textContent = tab.url || '(알 수 없음)';
     }
 
-    // 1. Load cached subjects and selection instantly
     const { cachedSubjects, lastSelectedSubjectId } = await getStorageData(['cachedSubjects', 'lastSelectedSubjectId']);
     if (cachedSubjects) {
       populateSubjects(cachedSubjects, lastSelectedSubjectId);
     }
 
-    // 2. Fetch fresh subjects in the background
     chrome.runtime.sendMessage({ action: 'getSubjects' }, (response) => {
       if (response && response.success) {
         const freshSubjects = response.data;
         const previouslySelectedId = subjectsDropdown.value;
-
-        // 3. Update storage with fresh data
         chrome.storage.local.set({ cachedSubjects: freshSubjects });
 
-        // 4. Re-populate dropdown and try to preserve selection
         const selectionStillExists = freshSubjects.some(s => s.id == previouslySelectedId);
         const newSelectedId = selectionStillExists ? previouslySelectedId : (freshSubjects[0]?.id || null);
         
         populateSubjects(freshSubjects, newSelectedId);
 
       } else if (response) {
-        // Don't overwrite status if it's not a critical error
         console.warn(`주제 로딩 실패: ${response.error || '알 수 없는 오류'}`);
         if (response.shouldRelogin) {
           chrome.storage.local.remove(['accessToken', 'username', 'password', 'cachedSubjects', 'lastSelectedSubjectId'], () => {
@@ -113,7 +107,6 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
 
-      // Persist the last selected subject ID
       chrome.storage.local.set({ lastSelectedSubjectId: selectedSubjectId });
 
       statusDiv.textContent = '콘텐츠를 추출하는 중...';
@@ -181,7 +174,15 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     loginError.style.display = 'none';
 
+    // Disable button to prevent multiple clicks
+    loginButton.disabled = true;
+    loginButton.textContent = '로그인 중...';
+
     chrome.runtime.sendMessage({ action: 'login', data: { username, password } }, (response) => {
+      // Re-enable button regardless of the outcome
+      loginButton.disabled = false;
+      loginButton.textContent = '로그인';
+
       if (chrome.runtime.lastError) {
         console.error(chrome.runtime.lastError.message);
         loginError.textContent = '알 수 없는 오류가 발생했습니다.';
@@ -200,7 +201,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Handle Logout Button Click
   logoutButton.addEventListener('click', () => {
-    // Clear all relevant storage on logout
     chrome.storage.local.remove(['accessToken', 'username', 'password', 'cachedSubjects', 'lastSelectedSubjectId'], () => {
       console.log('Logged out and all user data cleared.');
       showLogin();
