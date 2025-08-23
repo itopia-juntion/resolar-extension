@@ -1,0 +1,36 @@
+/* popup/popup.css */
+html, body {
+  margin: 0;
+  padding: 12px;
+  min-width: 280px;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, Apple Color Emoji, Segoe UI Emoji;
+  font-size: 14px;
+  line-height: 1.45;
+}
+header h1 {
+  font-size: 16px;
+  margin: 0 0 8px;
+}
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0;
+}
+button {
+  cursor: pointer;
+  border: 1px solid #ddd;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: #fff;
+}
+button:hover { background: #f6f6f6; }
+.info {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #eee;
+}
+.status {
+  margin-top: 6px;
+  color: #0a0;
+}
