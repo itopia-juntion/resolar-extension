@@ -106,78 +106,86 @@ function showNotification(title, message) {
   });
 }
 
+// Common function to handle API responses
+async function handleApiResponse(response) {
+    if (response.ok) {
+        if (response.status === 201 || response.status === 200) {
+             const data = await response.json().catch(() => null); // Handle empty body
+             return { success: true, data };
+        }
+    }
+    if (response.shouldRelogin) {
+        return { success: false, error: response.error, shouldRelogin: true };
+    }
+    const errorData = await response.json().catch(() => ({ message: '알 수 없는 서버 오류' }));
+    return { success: false, error: errorData.message || `HTTP ${response.status}` };
+}
+
+
 // Listen for messages from popup or content scripts
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   let keepChannelOpen = true;
 
-  if (request.action === 'login') {
-    const { username, password } = request.data;
-    login(username, password).then(sendResponse);
-  } else if (request.action === 'submitData') {
-    const endpoint = `${API_BASE_URL}/pages`;
-    
-    fetchWithAuth(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(request.data),
-    })
-    .then(async response => {
-        if (response.ok) {
-            return { success: true, data: await response.json() };
-        }
-        if (response.shouldRelogin) {
-            return { success: false, error: response.error, shouldRelogin: true };
-        }
-        const errorData = await response.json().catch(() => ({ message: '알 수 없는 서버 오류' }));
-        return { success: false, error: errorData.message || `HTTP ${response.status}` };
-    })
-    .then(sendResponse)
-    .catch(error => {
-        console.error("Error submitting data:", error);
-        sendResponse({ success: false, error: error.message });
-    });
-  } else if (request.action === 'getSubjects') {
-    const endpoint = `${API_BASE_URL}/subjects`;
-    fetchWithAuth(endpoint, { method: 'GET' })
-    .then(async response => {
-        if (response.ok) {
-            return { success: true, data: await response.json() };
-        }
-        if (response.shouldRelogin) {
-            return { success: false, error: response.error, shouldRelogin: true };
-        }
-        const errorData = await response.json().catch(() => ({ message: '주제 목록을 불러올 수 없습니다.' }));
-        return { success: false, error: errorData.message || `HTTP ${response.status}` };
-    })
-    .then(sendResponse)
-    .catch(error => {
-        console.error("Error fetching subjects:", error);
-        sendResponse({ success: false, error: error.message });
-    });
-  } else if (request.action === 'addSubject') {
-    const endpoint = `${API_BASE_URL}/subjects`;
-    fetchWithAuth(endpoint, {
+  switch (request.action) {
+    case 'login':
+      login(request.data.username, request.data.password).then(sendResponse);
+      break;
+
+    case 'submitData':
+    case 'submitHighlightData':
+      const apiPath = request.data.apiEndpoint || 'pages';
+      const endpoint = `${API_BASE_URL}/${apiPath}`;
+      
+      // The server doesn't need the apiEndpoint field
+      if (request.data.apiEndpoint) {
+        delete request.data.apiEndpoint;
+      }
+
+      fetchWithAuth(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: request.name })
-    })
-    .then(async response => {
-        if (response.status === 200) { // Created
-            return { success: true, data: null };
+        body: JSON.stringify(request.data),
+      })
+      .then(handleApiResponse)
+      .then(sendResponse)
+      .catch(error => {
+          console.error(`Error submitting data to ${apiPath}:`, error);
+          sendResponse({ success: false, error: error.message });
+      });
+      break;
+
+    case 'getSubjects':
+      fetchWithAuth(`${API_BASE_URL}/subjects`, { method: 'GET' })
+      .then(handleApiResponse)
+      .then(sendResponse)
+      .catch(error => {
+          console.error("Error fetching subjects:", error);
+          sendResponse({ success: false, error: error.message });
+      });
+      break;
+
+    case 'addSubject':
+      fetchWithAuth(`${API_BASE_URL}/subjects`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: request.name })
+      })
+      .then(async response => { // Special handling for 200 instead of 201
+        if (response.status === 200) { 
+            return { success: true, data: await response.json() };
         }
-        if (response.shouldRelogin) {
-            return { success: false, error: response.error, shouldRelogin: true };
-        }
-        const errorData = await response.json().catch(() => ({ message: '주제를 추가할 수 없습니다.' }));
-        return { success: false, error: errorData.message || `HTTP ${response.status}` };
-    })
-    .then(sendResponse)
-    .catch(error => {
-        console.error("Error adding subject:", error);
-        sendResponse({ success: false, error: error.message });
-    });
-  } else {
+        return handleApiResponse(response); // Use common handler for other cases
+      })
+      .then(sendResponse)
+      .catch(error => {
+          console.error("Error adding subject:", error);
+          sendResponse({ success: false, error: error.message });
+      });
+      break;
+
+    default:
       keepChannelOpen = false;
+      break;
   }
 
   return keepChannelOpen;
@@ -233,13 +241,12 @@ chrome.commands.onCommand.addListener(async (command) => {
       body: JSON.stringify(data),
     });
 
-    if (response.ok) {
+    const result = await handleApiResponse(response);
+    if (result.success) {
       showNotification('Resolar', '페이지가 성공적으로 저장되었습니다!');
     } else {
-      const errorData = await response.json().catch(() => ({}));
-      const errorMessage = errorData.message || '알 수 없는 서버 오류가 발생했습니다.';
-      showNotification('Resolar 저장 실패', `오류: ${errorMessage}`);
-       if (response.shouldRelogin) {
+      showNotification('Resolar 저장 실패', `오류: ${result.error}`);
+       if (result.shouldRelogin) {
            await chrome.storage.local.remove(['accessToken', 'username', 'password', 'cachedSubjects', 'lastSelectedSubjectId']);
        }
     }

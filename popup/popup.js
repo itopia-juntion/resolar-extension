@@ -13,6 +13,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const saveButton = document.getElementById('save-page-button');
   const subjectsDropdown = document.getElementById('subjects-dropdown');
   const logoutButton = document.getElementById('logout-button');
+  const highlightToggle = document.getElementById('highlight-toggle');
 
   // Subject UI Elements
   const subjectSelectionContainer = document.getElementById('subject-selection-container');
@@ -96,6 +97,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     if (tab) {
       urlSpan.textContent = tab.url || '(알 수 없음)';
+      
+      // Initialize highlight toggle state
+      const { [`highlight-enabled-${tab.id}`]: isEnabled } = await getStorageData([`highlight-enabled-${tab.id}`]);
+      highlightToggle.checked = !!isEnabled;
     }
 
     const { cachedSubjects, lastSelectedSubjectId } = await getStorageData(['cachedSubjects', 'lastSelectedSubjectId']);
@@ -123,6 +128,23 @@ document.addEventListener('DOMContentLoaded', () => {
       chrome.storage.local.set({ lastSelectedSubjectId: selectedSubjectId });
 
       statusDiv.textContent = '콘텐츠를 추출하는 중...';
+      
+      // Get highlights if enabled
+      const isHighlightingEnabled = highlightToggle.checked;
+      let highlights = [];
+      if (isHighlightingEnabled) {
+        try {
+          const response = await chrome.tabs.sendMessage(tab.id, { action: 'getHighlights' });
+          if (response && response.highlights) {
+            highlights = response.highlights;
+          }
+        } catch (e) {
+          console.error('하이라이트 정보 가져오기 실패:', e);
+          statusDiv.textContent = '하이라이트 정보를 가져오는 데 실패했습니다. 페이지를 새로고침하고 다시 시도해주세요.';
+          return;
+        }
+      }
+
       let contentResponse;
       try {
         contentResponse = await chrome.tabs.sendMessage(tab.id, { action: 'getContent' });
@@ -144,9 +166,26 @@ document.addEventListener('DOMContentLoaded', () => {
         subjectId: parseInt(selectedSubjectId, 10),
       };
 
+      let action = 'submitData';
+      let apiEndpoint = 'pages';
+
+      if (highlights.length > 0) {
+        data.highlights = highlights;
+        const totalHighlightLength = highlights.reduce((acc, h) => acc + h.length, 0);
+        
+        if (totalHighlightLength > 300) {
+          delete data.content; // content 필드 제거
+          apiEndpoint = 'pages/highlight/large';
+        } else {
+          apiEndpoint = 'pages/highlight';
+        }
+        action = 'submitHighlightData'; // 백그라운드에서 처리할 액션 변경
+        data.apiEndpoint = apiEndpoint; // 엔드포인트 정보 추가
+      }
+
       statusDiv.textContent = '서버로 전송하는 중...';
       
-      chrome.runtime.sendMessage({ action: 'submitData', data: data }, (serverResponse) => {
+      chrome.runtime.sendMessage({ action, data }, (serverResponse) => {
         if (serverResponse && serverResponse.success) {
           statusDiv.textContent = '페이지가 성공적으로 저장되었습니다!';
         } else {
@@ -162,6 +201,21 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   // --- Event Listeners ---
+
+  // Highlight toggle listener
+  highlightToggle.addEventListener('change', async (event) => {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (tab) {
+      const isEnabled = event.target.checked;
+      await chrome.storage.local.set({ [`highlight-enabled-${tab.id}`]: isEnabled });
+      try {
+        await chrome.tabs.sendMessage(tab.id, { action: 'toggleHighlighting', enabled: isEnabled });
+      } catch (e) {
+        console.warn('콘텐츠 스크립트가 활성화되지 않았을 수 있습니다.', e);
+        statusDiv.textContent = '페이지를 새로고침해야 하이라이트 기능이 활성화됩니다.';
+      }
+    }
+  });
 
   // Check login status on popup open
   chrome.storage.local.get(['accessToken'], (result) => {
@@ -216,6 +270,11 @@ document.addEventListener('DOMContentLoaded', () => {
   logoutButton.addEventListener('click', () => {
     chrome.storage.local.remove(['accessToken', 'username', 'password', 'cachedSubjects', 'lastSelectedSubjectId'], () => {
       console.log('Logged out and all user data cleared.');
+      // 모든 탭의 하이라이트 상태도 초기화
+      chrome.storage.local.get(null, (items) => {
+        const keysToRemove = Object.keys(items).filter(key => key.startsWith('highlight-enabled-'));
+        chrome.storage.local.remove(keysToRemove);
+      });
       showLogin();
     });
   });
