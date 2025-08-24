@@ -8,7 +8,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const loginError = document.getElementById('login-error');
 
   // Main App UI Elements
-  const urlSpan = document.getElementById('url');
   const statusDiv = document.getElementById('status');
   const saveButton = document.getElementById('save-page-button');
   const subjectsDropdown = document.getElementById('subjects-dropdown');
@@ -96,7 +95,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const initializeMainApp = async () => {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     if (tab) {
-      urlSpan.textContent = tab.url || '(알 수 없음)';
       
       // Initialize highlight toggle state
       const { [`highlight-enabled-${tab.id}`]: isEnabled } = await getStorageData([`highlight-enabled-${tab.id}`]);
